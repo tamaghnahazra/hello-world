@@ -1,6 +1,5 @@
 (* ::Package:: *)
 
-
 FermiDirac[0] = Function[{x},If[Abs[x]<$MachineEpsilon, 1/2, UnitStep[-x]]];
 FermiDirac[temperature_] := Module[{\[Beta]=1/temperature}, 1/(Exp[\[Beta] #]+1)&];
 
