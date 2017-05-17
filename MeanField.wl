@@ -143,6 +143,80 @@ CollectMF = Function[{\[CapitalGamma],\[CapitalDelta]},
   ]
 ];
 
+
+TMDHamMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
+  Function[{kx, ky},
+    Module[{k={kx,ky}, hKinetic1, hKinetic2, hShift, hPairing, \[CapitalDelta]AB, \[CapitalDelta]BA, \[CapitalDelta]0},
+      hKinetic1 = TMDHamNonInt[ kx,  ky] - U/2 IdentityMatrix[numSpin * numOrbital] - 3 * V IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
+      hKinetic2 = TMDHamNonInt[-kx, -ky] - U/2 IdentityMatrix[numSpin * numOrbital] - 3 * V IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
+      Do[\[CapitalDelta]AB[\[Sigma]1, \[Sigma]2] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[-I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[-I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+      Do[\[CapitalDelta]BA[\[Sigma]1, \[Sigma]2] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[ I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[ I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+      
+      \[CapitalDelta]0[sub_] := \[CapitalDelta]os[[sub]];
+      
+      hPairing = {{           0,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
+                  {  \[CapitalDelta]BA[Up,Up],           0,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
+                  {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],           0,  \[CapitalDelta]AB[Dn,Dn]},
+                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],          0}}; (*TODO(kyungminlee): Verify *)
+      ArrayFlatten[{{hKinetic1,hPairing},{ConjugateTranspose[hPairing],-Transpose[hKinetic2]}}]
+    ]
+  ]
+];
+
+(* Assume eigenvalues sorted in descending order :
+   eigenvectors matrix (returned from `Eigensystem`)  = [ U  V  ;  V^*  U^*] *)
+ComputeMF2 = Function[{kx, ky, eigenvalues, eigenvectors},
+  Module[{k={kx,ky}, \[Psi], e, f, u, v, \[Rho], t, \[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart},
+    (*
+    \[Psi] = ArrayReshape[eigenvectors, {numNambu,  numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
+    e = ArrayReshape[eigenvalues,  {numNambu,  numSpin*numOrbital}];
+    u = \[Psi][[1, All, 1, All, All]];
+    v = \[Psi][[1, All, 2, All, All]];
+    f = Map[fermi, e[[1, All]]]; (* Only positive eigenvalues *)
+    \[Rho][s1_,l1_,s2_,l2_] :=                  Total[u[[All, s1, l1]]*f*Conjugate[u[[All, s2, l2]]]] + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * v[[All, s2, l2]]];
+    t[s1_,l1_,s2_,l2_] := t[s1,l1,s2,l2] = Total[u[[All, s1, l1]]*f*Conjugate[v[[All, s2, l2]]]] + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * u[[All, s2, l2]]];
+    *)
+    \[Psi] = ArrayReshape[eigenvectors, {numNambu*numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
+    e = ArrayReshape[eigenvalues,  {numNambu*numSpin*numOrbital}];
+    u = \[Psi][[All, 1, All, All]];
+    v = \[Psi][[All, 2, All, All]];
+    f = fermi /@ e;
+    (* TODO(kmlee): check Sign of I k.r in Exp *)
+    \[Rho][s1_,l1_,s2_,l2_,r_] := 1/2 (Total[u[[All, s1, l1]]*f*Conjugate[u[[All, s2, l2]]]]*Exp[I k.r] + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * v[[All, s2, l2]]]*Exp[-I k.r]);
+    t[s1_,l1_,s2_,l2_,r_] := 1/2 (Total[u[[All, s1, l1]]*f*Conjugate[v[[All, s2, l2]]]]*Exp[I k.r] + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * u[[All, s2, l2]]]*Exp[-I k.r]);
+    \[CapitalGamma]part = (U + 6 V)/4 * (\[Rho][Up,A,Up,A,{0,0}] + \[Rho][Up,B,Up,B,{0,0}] + \[Rho][Dn,A,Dn,A,{0,0}] + \[Rho][Dn,B,Dn,B,{0,0}]); (* Note: U can be replaced by a function of (kx, ky) *)
+    \[CapitalDelta]part = (U/2) * {t[Up,A,Dn,A,{0,0}] - t[Dn,A,Up,A,{0,0}], t[Up,B,Dn,B,{0,0}] - t[Dn,B,Up,B,{0,0}]};
+    \[CapitalDelta]nnpart = (V/2) * Table[t[\[Sigma]1, A, \[Sigma]2, B, r] - t[\[Sigma]2, B, \[Sigma]1, A, -r], {r, {a1, a2, a3}}, {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+    {\[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart}
+  ]
+];
+
+
+(* Given \[CapitalGamma], \[CapitalDelta],
+   scan over BZ,
+   compute contributionos of new \[CapitalGamma] and new \[CapitalDelta] at each (kx, ky),
+   and return their means (over BZ) *)
+CollectMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
+  Module[{hamMF= TMDHamMF2[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn]},
+    1/(N1*N2) Sum[
+      Module[{hk=hamMF@@k, eigenvalues, eigenvectors, idxPerm},
+        {eigenvalues, eigenvectors} = Eigensystem[hk];
+        
+        (* essential step for extracting U and V correctly *)
+        (*
+        idxPerm = Ordering[eigenvalues, numNambu * numSpin * numOrbital, Greater];
+        eigenvalues = eigenvalues[[idxPerm]];
+        eigenvectors = eigenvectors[[idxPerm]];
+        *)
+
+        (*Print["eigenvalues=", eigenvalues];Print["eigenvectors=", eigenvectors];*)
+        ComputeMF2[Sequence@@k, eigenvalues, eigenvectors]
+      ],
+      {k, tmdLattice["kVectorSpan"]}
+    ]
+  ]
+];
+
 ] (* InitializeTMD *)
 
 
