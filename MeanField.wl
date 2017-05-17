@@ -69,7 +69,7 @@ TMDHamNonInt = Function[{kx, ky},
   Module[{k={kx, ky}, T1, T1c, T2, \[Lambda]},
     T1 = -(Exp[-I k.a1] + Exp[-I k.a2] + Exp[-I k.a3]);
     T1c = Conjugate[T1];
-    T2 = 2\[Beta]Ising * (Sin[b1.k]+Sin[b2.k]+Sin[b3.k]);
+    T2 = 2\[Beta]Ising * (Sin[b1.k] + Sin[b2.k] + Sin[b3.k]);
     \[Lambda] = 2\[Alpha] * (Sin[a1.k] + Sin[a2.k] + Sin[a3.k]);
     {{-\[Mu]+mz-T2,        T1,         0,         \[Lambda]},
      {      T1c, -\[Mu]-mz+T2,        -\[Lambda],         0},
@@ -81,8 +81,8 @@ TMDHamNonInt = Function[{kx, ky},
 TMDHamMF = Function[{\[CapitalGamma],\[CapitalDelta]},
   Function[{kx, ky},
     Module[{hKinetic1, hKinetic2, hShift, hPairing},
-      hKinetic1 = TMDHamNonInt[kx, ky]-U/2 IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
-      hKinetic2 = TMDHamNonInt[-kx, -ky]-U/2 IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
+      hKinetic1 = TMDHamNonInt[ kx,  ky] - U/2 IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
+      hKinetic2 = TMDHamNonInt[-kx, -ky] - U/2 IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
       hPairing = {{ 0, 0, \[CapitalDelta], 0},
                   { 0, 0, 0, \[CapitalDelta]},
                   {-\[CapitalDelta], 0, 0, 0},
@@ -110,7 +110,7 @@ ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
     Do[If[Abs[t[i,j,k,l]]>10^-8,Print[StringForm["t(``,``,``,``)=``",i,j,k,l,t[i,j,k,l]]]],{i,1,2},{j,1,2},{k,1,2},{l,1,2}];
     Print["t1=", t[Up,A,Dn,A]];Print["t2=", t[Up,B,Dn,B]];
     *)
-    \[CapitalGamma]part = U ( \[Rho][Up,A,Up,A]+\[Rho][Up,B,Up,B]+\[Rho][Dn,A,Dn,A]+\[Rho][Dn,B,Dn,B])/4; (* Note: U can be replaced by a function of (kx, ky) *)
+    \[CapitalGamma]part = U (\[Rho][Up,A,Up,A] + \[Rho][Up,B,Up,B] + \[Rho][Dn,A,Dn,A] + \[Rho][Dn,B,Dn,B])/4; (* Note: U can be replaced by a function of (kx, ky) *)
     \[CapitalDelta]part = U (t[Up,A,Dn,A] + t[Up,B,Dn,B])/2;
     {\[CapitalGamma]part, \[CapitalDelta]part}
   ]
@@ -121,7 +121,7 @@ ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
    compute contributionos of new \[CapitalGamma] and new \[CapitalDelta] at each (kx, ky),
    and return their means (over BZ) *)
 CollectMF = Function[{\[CapitalGamma],\[CapitalDelta]},
-  Module[{hamMF= TMDHamMF[\[CapitalGamma],\[CapitalDelta]];},
+  Module[{hamMF= TMDHamMF[\[CapitalGamma],\[CapitalDelta]]},
     1/(N1*N2) Sum[
       Module[{hk = hamMF@@k, eigenvalues, eigenvectors, idxPerm},
         {eigenvalues, eigenvectors} = Eigensystem[hk];
