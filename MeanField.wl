@@ -220,17 +220,18 @@ CollectMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
 
 
 
-
-
 (* Example *)
-
-currentValue={0.5, 0.1};
-result = Table[
-	InitializeTMD[16, 16, \[Alpha]-> 0.0, U -> -4.0, T->temperature];
-	{temperature, currentValue=Nest[CollectMF@@#&, currentValue, 200]},
-	{temperature, {0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}}
-	]
-ListPlot[ Map[{#[[1]],Abs[#[[2]][[2]]]}&, result] ]
+onsiteInteraction = -3.0;
+nearestNeighborInteraction = -0.2;
+InitializeTMD[24, 24, OnSiteInteraction->onsiteInteraction, NearestNeighborInteraction->nearestNeighborInteraction, ChemicalPotential->0.5, Temperature->0.1];
 
 
+{\[CapitalGamma]c2, \[CapitalDelta]osc, \[CapitalDelta]nnc} = {0.5*(onsiteInteraction + 6*nearestNeighborInteraction), RandomReal[{-0.5, 0.5}, 2], RandomReal[{-0.5, 0.5}, {3,2,2}]};
+
+
+allResults = NestList[(CollectMF2@@#)&,{\[CapitalGamma]c2, \[CapitalDelta]osc, \[CapitalDelta]nnc}, 50];
+
+
+results=allResults[[;;]];
+ArrayReshape[ Flatten[results], {Length[results], 1+2+3*2*2}]//Chop//TableForm
 
