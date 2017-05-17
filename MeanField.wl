@@ -29,15 +29,22 @@ NewLattice[a1_List,a2_List,N1_Integer,N2_Integer] :=
   ]
 
 
-(*InitializeTMD[N1_Integer, N2_Integer, \[Beta]Ising_, mz_, \[Mu]_, \[Alpha]_, U_, T_] := *)
-InitializeTMD[N1_Integer, N2_Integer, OptionsPattern[{\[Beta]Ising->0, mz->0, \[Mu]->0, \[Alpha]->0, U->0, T->0}]] := 
+(*InitializeTMD[N1_Integer, N2_Integer, \[Beta]Ising_, mz_, \[Mu]_, \[Alpha]_, U_, V_, T_] := *)
+InitializeTMD[N1_Integer, N2_Integer, OptionsPattern[{IsingSpinOrbitCoupling->0, 
+                                                       ChargeTransferEnergy->0,
+                                                       ChemicalPotential->0,
+                                                       RashbaSpinOrbitCoupling->0,
+                                                       OnSiteInteraction->0,
+                                                       NearestNeighborInteraction->0,
+                                                       Temperature->0}]] := 
 
-Module[{\[Beta]Ising=OptionValue[\[Beta]Ising],
-        mz=OptionValue[mz],
-        \[Mu]=OptionValue[\[Mu]],
-        \[Alpha]=OptionValue[\[Alpha]],
-        U=OptionValue[U],
-        T=OptionValue[T],
+Module[{\[Beta]Ising=OptionValue[IsingSpinOrbitCoupling],
+        mz=OptionValue[ChargeTransferEnergy],
+        \[Mu]=OptionValue[ChemicalPotential],
+        \[Alpha]=OptionValue[RashbaSpinOrbitCoupling],
+        U=OptionValue[OnSiteInteraction],
+        V=OptionValue[NearestNeighborInteraction],
+        T=OptionValue[Temperature],
         \[Sigma], \[Sigma]\[Sigma],
         Up=1, Dn=2, A=1, B=2,
         a1, a2, a3, b1, b2, b3, tmdLattice,
