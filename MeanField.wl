@@ -1,7 +1,14 @@
 (* ::Package:: *)
 
-FermiDirac[0] = UnitStep[-#]&;
+
+FermiDirac[0] = Function[{x},If[Abs[x]<$MachineEpsilon, 1/2, UnitStep[-x]]];
 FermiDirac[temperature_] := Module[{\[Beta]=1/temperature}, 1/(Exp[\[Beta] #]+1)&];
+
+
+(* Compiled Version *)
+FermiDirac[0] = Compile[{{x,_Real}},If[Abs[x]<1.0*10^-12,0.5,UnitStep[-x]]];
+FermiDirac[temperature_] := Module[{\[Beta]=1/temperature}, Compile[{{e,_Real}},1/(Exp[\[Beta] e]+1)]];
+
 
 
 (*Construct a new 2D Bravais lattice of size N1, N2 with lattice constants a1, a2 on a torus*)
