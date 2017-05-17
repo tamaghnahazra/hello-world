@@ -113,15 +113,12 @@ ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
     f = Map[fermi, e[[1, All]]]; (* Only positive eigenvalues *)
     \[Rho][i_,j_,k_,l_] := (* \[Rho][i, j, k, l] =*) Total[u[[All, i, j]]*f*Conjugate[u[[All, k, l]]] + Conjugate[v[[All, i, j]]] * (1 - f) * v[[All, k, l]]];
     t[i_,j_,k_,l_] := (* t[i, j, k, l] =*) Total[u[[All, i, j]]*f*Conjugate[v[[All, k, l]]] + Conjugate[v[[All, i, j]]] * (1 - f) * u[[All, k, l]]];
-    (*
-    Do[If[Abs[t[i,j,k,l]]>10^-8,Print[StringForm["t(``,``,``,``)=``",i,j,k,l,t[i,j,k,l]]]],{i,1,2},{j,1,2},{k,1,2},{l,1,2}];
-    Print["t1=", t[Up,A,Dn,A]];Print["t2=", t[Up,B,Dn,B]];
-    *)
     \[CapitalGamma]part = U (\[Rho][Up,A,Up,A] + \[Rho][Up,B,Up,B] + \[Rho][Dn,A,Dn,A] + \[Rho][Dn,B,Dn,B])/4; (* Note: U can be replaced by a function of (kx, ky) *)
     \[CapitalDelta]part = U (t[Up,A,Dn,A] + t[Up,B,Dn,B])/2;
     {\[CapitalGamma]part, \[CapitalDelta]part}
   ]
 ];
+
 
 (* Given \[CapitalGamma], \[CapitalDelta],
    scan over BZ,
