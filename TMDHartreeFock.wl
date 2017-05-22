@@ -18,6 +18,7 @@ InitializeTMD[N1_Integer, N2_Integer, OptionsPattern[{IsingSpinOrbitCoupling->0,
                                                        Temperature->0}]]";
 
 TMDHamNonInt::usage = "";
+
 TMDHamMF::usage = "";
 ComputeMF::usage = "";
 CollectMF::usage = "";
@@ -211,12 +212,6 @@ ComputeMF2 = Function[{kx, ky, eigenvalues, eigenvectors},
     v = \[Psi][[All, 2, All, All]];
     f = fermi /@ e;
     (* TODO(kmlee): check Sign of I k.r in Exp *)
-    (*
-    \[Rho][s1_,l1_,s2_,l2_,r_] := 1/2 (  Total[u[[All, s1, l1]] * f * Conjugate[u[[All, s2, l2]]]] * Exp[-I k.r] 
-                                   + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * v[[All, s2, l2]]]*Exp[ I k.r]);
-    t[s1_,l1_,s2_,l2_,r_] := 1/2 (  Total[u[[All, s1, l1]] * f * Conjugate[v[[All, s2, l2]]]] * Exp[-I k.r]
-                                   + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * u[[All, s2, l2]]] * Exp[ I k.r]);
-    *)
     \[Rho][s1_,l1_,s2_,l2_,r_] := Total[ u[[All, s1, l1]] * (1 - f) * Conjugate[ u[[All, s2, l2]] ] ] * Exp[I k.r];
     t[s1_,l1_,s2_,l2_,r_] := Total[ Conjugate[ v[[All, s1, l1]] ] * (1 - f) * u[[All, s2, l2]] ] * Exp[I k.r];
                                        
@@ -263,13 +258,3 @@ allResults = NestList[(CollectMF2@@#)&,{\[CapitalGamma]c2, \[CapitalDelta]osc, \
 results=allResults[[;;]];
 ArrayReshape[ Flatten[results], {Length[results], 1+2+3*2*2}]//Chop//TableForm
 *)
-
-
-
-
-
-
-
-
-
-
