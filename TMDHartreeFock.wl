@@ -102,15 +102,18 @@ b3 = {-Sqrt[3]/2, -3/2};
 tmdLattice = NewLattice[b1, b2, N1, N2];
 
 TMDHamNonInt = Function[{kx, ky},
-  Module[{k={kx, ky}, T1, T1c, T2, \[Lambda]},
+  Module[{k={kx, ky}, T1, T1c, T2, \[Lambda]p, \[Lambda]m, \[Lambda]pc, \[Lambda]mc},
     T1 = -(Exp[I k.a1] + Exp[I k.a2] + Exp[I k.a3]);
     T1c = Conjugate[T1];
     T2 = 2\[Beta]Ising * (Sin[b1.k] + Sin[b2.k] + Sin[b3.k]);
-    \[Lambda] = 2\[Alpha] * (Sin[a1.k] + Sin[a2.k] + Sin[a3.k]);
-    {{-\[Mu]+mz-T2,        T1,         0,         \[Lambda]},
-     {      T1c, -\[Mu]-mz+T2,        -\[Lambda],         0},
-     {        0,        -\[Lambda], -\[Mu]+mz+T2,        T1},
-     {        \[Lambda],         0,       T1c, -\[Mu]-mz-T2}}
+    \[Lambda]p = \[Alpha] * Sum[(r[[2]]+I r[[1]])Exp[I k.r],{r,{ a1, a2, a3}}];
+    \[Lambda]m = \[Alpha] * Sum[(r[[2]]+I r[[1]])Exp[I k.r],{r,{-a1,-a2,-a3}}];
+    \[Lambda]pc = Conjugate[\[Lambda]p];
+    \[Lambda]mc = Conjugate[\[Lambda]m];
+    {{-\[Mu]+mz-T2,        T1,         0,        \[Lambda]p},
+     {      T1c, -\[Mu]-mz+T2,        \[Lambda]m,         0},
+     {        0,       \[Lambda]mc, -\[Mu]+mz+T2,        T1},
+     {      \[Lambda]pc,         0,       T1c, -\[Mu]-mz-T2}}
   ]
 ];
 
@@ -177,15 +180,15 @@ CollectMF = Function[{\[CapitalGamma],\[CapitalDelta]},
 TMDHamMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
   Function[{kx, ky},
     Module[{k={kx,ky}, hKinetic1, hKinetic2, hShift, hPairing, \[CapitalDelta]AB, \[CapitalDelta]BA, \[CapitalDelta]0},
-      hKinetic1 = TMDHamNonInt[ kx,  ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
-      hKinetic2 = TMDHamNonInt[-kx, -ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
+      hKinetic1 = TMDHamNonInt[ kx,  ky] (*- ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital]*);
+      hKinetic2 = TMDHamNonInt[-kx, -ky] (*- ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital]*);
       Do[\[CapitalDelta]AB[\[Sigma]1, \[Sigma]2] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[ I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[ I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
       Do[\[CapitalDelta]BA[\[Sigma]1, \[Sigma]2] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[-I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[-I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
       \[CapitalDelta]0[sub_] := \[CapitalDelta]os[[sub]];
       hPairing = {{           0,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
                   {  \[CapitalDelta]BA[Up,Up],           0,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
                   {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],           0,  \[CapitalDelta]AB[Dn,Dn]},
-                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],          0}}; (*TODO(kyungminlee): Verify *)
+                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],          0}} // Developer`ToPackedArray; (*TODO(kyungminlee): Verify *)
       ArrayFlatten[{{hKinetic1,hPairing},{ConjugateTranspose[hPairing],-Transpose[hKinetic2]}}]
     ]
   ]
@@ -197,26 +200,23 @@ TMDHamMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
    eigenvectors matrix (returned from `Eigensystem`)  = [ U  V  ;  V^*  U^*] *)
 ComputeMF2 = Function[{kx, ky, eigenvalues, eigenvectors},
   Module[{k={kx,ky}, \[Psi], e, f, u, v, \[Rho], t, \[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart},
-    (*
-    \[Psi] = ArrayReshape[eigenvectors, {numNambu,  numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
-    e = ArrayReshape[eigenvalues,  {numNambu,  numSpin*numOrbital}];
-    u = \[Psi][[1, All, 1, All, All]];
-    v = \[Psi][[1, All, 2, All, All]];
-    f = Map[fermi, e[[1, All]]]; (* Only positive eigenvalues *)
-    \[Rho][s1_,l1_,s2_,l2_] :=                  Total[u[[All, s1, l1]]*f*Conjugate[u[[All, s2, l2]]]] + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * v[[All, s2, l2]]];
-    t[s1_,l1_,s2_,l2_] := t[s1,l1,s2,l2] = Total[u[[All, s1, l1]]*f*Conjugate[v[[All, s2, l2]]]] + Total[Conjugate[v[[All, s1, l1]]] * (1 - f) * u[[All, s2, l2]]];
-    *)
     \[Psi] = ArrayReshape[eigenvectors, {numNambu*numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
     e = ArrayReshape[eigenvalues,  {numNambu*numSpin*numOrbital}];
     u = \[Psi][[All, 1, All, All]];
     v = \[Psi][[All, 2, All, All]];
     f = fermi /@ e;
     (* TODO(kmlee): check Sign of I k.r in Exp *)
-    \[Rho][s1_,l1_,s2_,l2_,r_] := Total[ u[[All, s1, l1]] * (1 - f) * Conjugate[ u[[All, s2, l2]] ] ] * Exp[I k.r];
-    t[s1_,l1_,s2_,l2_,r_] := Total[ Conjugate[ v[[All, s1, l1]] ] * (1 - f) * u[[All, s2, l2]] ] * Exp[I k.r];
-                                       
+    \[Rho][s1_,l1_,s2_,l2_] := \[Rho][s1,l1,s2,l2] = Total[ u[[All, s1, l1]] * f * Conjugate[ u[[All, s2, l2]] ] ];
+    t[s1_,l1_,s2_,l2_] := t[s1,l1,s2,l2] = Total[ u[[All, s1, l1]] * f * Conjugate[ v[[All, s2, l2]] ] ];
+
+    \[Rho][s1_,l1_,s2_,l2_,r_] := \[Rho][s1,l1,s2,l2] * Exp[-I k.r];
+    t[s1_,l1_,s2_,l2_,r_] := t[s1,l1,s2,l2] * Exp[-I k.r];
+
     (* Print[StringForm["\[Rho]=``",(\[Rho][Up,A,Up,A,{0,0}] + \[Rho][Up,B,Up,B,{0,0}] + \[Rho][Dn,A,Dn,A,{0,0}] + \[Rho][Dn,B,Dn,B,{0,0}])]]; *)
+    (*
     \[CapitalGamma]part = ((U + 6 V)/4) * (\[Rho][Up,A,Up,A,{0,0}] + \[Rho][Up,B,Up,B,{0,0}] + \[Rho][Dn,A,Dn,A,{0,0}] + \[Rho][Dn,B,Dn,B,{0,0}]); (* Note: U can be replaced by a function of (kx, ky) *)
+    *)
+    \[CapitalGamma]part=0.0;
     \[CapitalDelta]part = (U/2) * {t[Up,A,Dn,A,{0,0}] - t[Dn,A,Up,A,{0,0}], t[Up,B,Dn,B,{0,0}] - t[Dn,B,Up,B,{0,0}]};
     \[CapitalDelta]nnpart = (V/2) * Table[t[\[Sigma]1, A, \[Sigma]2, B, r] - t[\[Sigma]2, B, \[Sigma]1, A, -r], {r, {a1, a2, a3}}, {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
     {\[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart}
