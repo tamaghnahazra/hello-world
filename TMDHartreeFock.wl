@@ -18,14 +18,15 @@ InitializeTMD[N1_Integer, N2_Integer, OptionsPattern[{IsingSpinOrbitCoupling->0,
                                                        Temperature->0}]]";
 
 TMDHamNonInt::usage = "";
-
 TMDHamMF::usage = "";
 ComputeMF::usage = "";
 CollectMF::usage = "";
 
-TMDHamMF2::usage = "";
-ComputeMF2::usage = "";
-CollectMF2::usage = "";
+CompiledTMDHamNonInt::usage = "";
+CompiledTMDHamMF::usage = "";
+CompiledComputeMF::usage = "";
+CompiledCollectMF::usage = "";
+
 
 
 Begin["`Private`"];
@@ -76,7 +77,7 @@ Module[{\[Beta]Ising=OptionValue[IsingSpinOrbitCoupling],
         \[Sigma], \[Sigma]\[Sigma],
         Up=1, Dn=2, A=1, B=2,
         a1, a2, a3, b1, b2, b3, tmdLattice,
-        fermi,
+        fermi,compiledFermi,
         numNambu=2, numSpin=2, numOrbital=2,
         vecSpinSpin},
 
@@ -91,6 +92,7 @@ Do[\[Sigma]\[Sigma][i,j] = KroneckerProduct[\[Sigma][i],\[Sigma][j]],
 
 (* `fermi` is the Fermi-Dirac distribution function for temperature T *)
 fermi = FermiDirac[T];
+compiledFermi = CompiledFermiDirac[T];
 
 (* Lattice constants *)
 a1 = { Sqrt[3]/2, 1/2};
@@ -102,6 +104,23 @@ b3 = {-Sqrt[3]/2, -3/2};
 tmdLattice = NewLattice[b1, b2, N1, N2];
 
 TMDHamNonInt = Function[{kx, ky},
+  Module[{k={kx, ky}, T1, T1c, T2, \[Lambda]p, \[Lambda]m, \[Lambda]pc, \[Lambda]mc},
+    T1 = -(Exp[I k.a1] + Exp[I k.a2] + Exp[I k.a3]);
+    T1c = Conjugate[T1];
+    T2 = 2\[Beta]Ising * (Sin[b1.k] + Sin[b2.k] + Sin[b3.k]);
+    \[Lambda]p = \[Alpha] * Sum[(r[[2]]+I r[[1]])Exp[I k.r],{r,{ a1, a2, a3}}];
+    \[Lambda]m = \[Alpha] * Sum[(r[[2]]+I r[[1]])Exp[I k.r],{r,{-a1,-a2,-a3}}];
+    \[Lambda]pc = Conjugate[\[Lambda]p];
+    \[Lambda]mc = Conjugate[\[Lambda]m];
+    {{-\[Mu]+mz-T2,        T1,         0,        \[Lambda]p},
+     {      T1c, -\[Mu]-mz+T2,        \[Lambda]m,         0},
+     {        0,       \[Lambda]mc, -\[Mu]+mz+T2,        T1},
+     {      \[Lambda]pc,         0,       T1c, -\[Mu]-mz-T2}}
+  ]
+];
+
+
+CompiledTMDHamNonInt = Compile[{{kx,_Real}, {ky,_Real}},
   Module[{k={kx, ky}, T1, T1c, T2, \[Lambda]p, \[Lambda]m, \[Lambda]pc, \[Lambda]mc},
     T1 = -(Exp[I k.a1] + Exp[I k.a2] + Exp[I k.a3]);
     T1c = Conjugate[T1];
@@ -131,8 +150,35 @@ TMDHamMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
       hPairing = {{           0,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
                   {  \[CapitalDelta]BA[Up,Up],           0,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
                   {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],           0,  \[CapitalDelta]AB[Dn,Dn]},
-                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],          0}} // Developer`ToPackedArray; (*TODO(kyungminlee): Verify *)
+                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],          0}}; (*TODO(kyungminlee): Verify *)
       ArrayFlatten[{{hKinetic1,hPairing},{ConjugateTranspose[hPairing],-Transpose[hKinetic2]}}]
+    ]
+  ]
+];
+
+
+CompiledTMDHamMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
+  Compile[{{kx,_Real}, {ky,_Real}},
+    Module[{
+        k={kx,ky},
+        hKinetic1 = CompiledTMDHamNonInt[ kx,  ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]],
+        hKinetic2 = CompiledTMDHamNonInt[-kx, -ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]],
+        hPairing=Table[0.0+0.0I,{i,1,4},{j,1,4}],
+        hOut=Table[0.0+0.0I,{i,1,8},{j,1,8}],
+        \[CapitalDelta]AB={{0.0+0.0 I, 0.0+0.0 I},{0.0+0.0 I, 0.0+0.0 I}},
+        \[CapitalDelta]BA={{0.0+0.0 I, 0.0+0.0 I},{0.0+0.0 I, 0.0+0.0 I}}
+      },
+      Do[\[CapitalDelta]AB[[\[Sigma]1, \[Sigma]2]] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[ I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[ I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+      Do[\[CapitalDelta]BA[[\[Sigma]1, \[Sigma]2]] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[-I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[-I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+      hPairing = {{     0.0+0.0 I,  \[CapitalDelta]AB[[Up,Up]],      \[CapitalDelta]os[[A]],  \[CapitalDelta]AB[[Up,Dn]]},
+                  {  \[CapitalDelta]BA[[Up,Up]],     0.0+0.0 I,  \[CapitalDelta]BA[[Up,Dn]],      \[CapitalDelta]os[[B]]},
+                  {     -\[CapitalDelta]os[[A]],  \[CapitalDelta]AB[[Dn,Up]],     0.0+0.0 I,  \[CapitalDelta]AB[[Dn,Dn]]},
+                  {  \[CapitalDelta]BA[[Dn,Up]],    -\[CapitalDelta]os[[B]],  \[CapitalDelta]BA[[Dn,Dn]],    0.0+0.0 I}};
+      hOut[[1;;4, 1;;4]]=hKinetic1;
+      hOut[[1;;4, 5;;8]]=hPairing;
+      hOut[[5;;8, 1;;4]]=ConjugateTranspose[hPairing];
+      hOut[[5;;8, 5;;8]]=-Transpose[hKinetic2];
+      hOut
     ]
   ]
 ];
@@ -166,6 +212,44 @@ ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
 ];
 
 
+CompiledComputeMF = Compile[{{kx,_Real}, {ky,_Real}, {eigenvalues,_Real, 1}, {eigenvectors,_Complex, 4}},
+(*CompiledComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},*)
+  Module[{
+      k={kx,ky},
+      n=Length[eigenvalues],
+      \[Rho]=Table[0.0+0.0 I, {s1,1,2}, {f1,1,2}, {s2,1,2}, {f2,1,2}],
+      t=Table[0.0+0.0 I, {s1,1,2}, {f1,1,2}, {s2,1,2}, {f2,1,2}],
+      \[Psi]=eigenvectors,
+      f=Table[0.0+0.0 I, {i,1,Length[eigenvalues]}],
+      \[CapitalGamma]part=Table[0.0+0.0 I, {i,1,4}],
+      \[CapitalDelta]part=Table[0.0+0.0 I, {i,1,2}],
+      \[CapitalDelta]nnpart=Table[0.0+0.0 I, {i1,1,3},{i2,1,2},{i3,1,2}]
+    },
+	Do[f[[i]] = compiledFermi[ eigenvalues[[i]] ], {i, 1, n}];
+    Do[\[Rho][[s1,f1,s2,f2]] = Sum[\[Psi][[i, 1, s1, f1]] * f[[i]] * Conjugate[ \[Psi][[i, 1, s2, f2]] ], {i,1,n}], {s1,1,2}, {f1,1,2}, {s2,1,2}, {f2,1,2}];
+    Do[t[[s1,f1,s2,f2]] = Sum[\[Psi][[i, 1, s1, f1]] * f[[i]] * Conjugate[ \[Psi][[i, 2, s2, f2]] ], {i,1,n}], {s1,1,2}, {f1,1,2}, {s2,1,2}, {f2,1,2}];
+    
+	\[CapitalGamma]part[[1]] = U*\[Rho][[Dn,A,Dn,A]] + 3*V*(\[Rho][[Up,B,Up,B]] + \[Rho][[Dn,B,Dn,B]]);
+    \[CapitalGamma]part[[2]] = U*\[Rho][[Dn,B,Dn,B]] + 3*V*(\[Rho][[Up,A,Up,A]] + \[Rho][[Dn,A,Dn,A]]);
+    \[CapitalGamma]part[[3]] = U*\[Rho][[Up,A,Up,A]] + 3*V*(\[Rho][[Up,B,Up,B]] + \[Rho][[Dn,B,Dn,B]]);
+    \[CapitalGamma]part[[4]] = U*\[Rho][[Up,B,Up,B]] + 3*V*(\[Rho][[Up,A,Up,A]] + \[Rho][[Dn,A,Dn,A]]);
+    
+    \[CapitalDelta]part[[1]] = (U/2) * (t[[Up,A,Dn,A]] - t[[Dn,A,Up,A]]);
+    \[CapitalDelta]part[[2]] = (U/2) * (t[[Up,B,Dn,B]] - t[[Dn,B,Up,B]]);
+    
+    Do[
+      \[CapitalDelta]nnpart[[1,\[Sigma]1,\[Sigma]2]] = (V/2) * (t[[\[Sigma]1, A, \[Sigma]2, B]] * Exp[-I k.a1] - t[[\[Sigma]2, B, \[Sigma]1, A]]* Exp[I k.a1]);
+      \[CapitalDelta]nnpart[[2,\[Sigma]1,\[Sigma]2]] = (V/2) * (t[[\[Sigma]1, A, \[Sigma]2, B]] * Exp[-I k.a2] - t[[\[Sigma]2, B, \[Sigma]1, A]]* Exp[I k.a2]);
+      \[CapitalDelta]nnpart[[3,\[Sigma]1,\[Sigma]2]] = (V/2) * (t[[\[Sigma]1, A, \[Sigma]2, B]] * Exp[-I k.a3] - t[[\[Sigma]2, B, \[Sigma]1, A]]* Exp[I k.a3]);
+    ,{\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+    
+    Join[\[CapitalGamma]part,\[CapitalDelta]part,Flatten[\[CapitalDelta]nnpart]]
+    
+  ]
+];
+
+
+
 (* Given \[CapitalGamma], \[CapitalDelta],
    scan over BZ,
    compute contributionos of new \[CapitalGamma] and new \[CapitalDelta] at each (kx, ky),
@@ -179,6 +263,28 @@ CollectMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
       ],
       {k, N[tmdLattice["kVectorSpan"]]}
     ]
+  ]
+];
+
+
+(* Given \[CapitalGamma], \[CapitalDelta],
+   scan over BZ,
+   compute contributionos of new \[CapitalGamma] and new \[CapitalDelta] at each (kx, ky),
+   and return their means (over BZ) *)
+CompiledCollectMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
+  Module[{hamMF=CompiledTMDHamMF[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn],out},
+    out=1/(N1*N2) Sum[
+      Module[{hk=hamMF@@k, eigenvalues, eigenvectors},
+        {eigenvalues, eigenvectors} = Eigensystem[hk];
+        CompiledComputeMF[Sequence@@k,
+          Re[eigenvalues],
+          ArrayReshape[eigenvectors,{numNambu*numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}]]
+      ],
+      {k, N[tmdLattice["kVectorSpan"]]}
+    ];
+    {out[[1;;4]],
+     out[[5;;6]],
+     ArrayReshape[out[[7;;]],{3,2,2}]}
   ]
 ];
 
