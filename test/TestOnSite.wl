@@ -52,7 +52,7 @@ Module[{result,diff,\[CapitalGamma]c, \[CapitalDelta]osc, \[CapitalDelta]nnc,\[C
 			"MEAN FIELD:ON-SITE PAIRING A"->\[CapitalDelta]osc[[1]],
 			"MEAN FIELD:ON-SITE PAIRING B"->\[CapitalDelta]osc[[2]]
 		}
-		~Join~Flatten[Table[StringForm["MEAN FIELD:NEAREST-NEIGHBOR PAIRING BOND-`` A-`` B-``",i,spinString[a],spinString[b]]->\[CapitalDelta]nnc[[i,a,b]],{i,1,3},{a,1,2},{b,1,2}]]
+		~Join~Flatten[Table[("MEAN FIELD:NEAREST-NEIGHBOR PAIRING BOND-"<>ToString[i]<>" A-"<>spinString[a]<>" B-"<>spinString[b])->\[CapitalDelta]nnc[[i,a,b]],{i,1,3},{a,1,2},{b,1,2}]]
 		~Join~{"SELF-CONSISTENT LOOP ERROR"->Max[Abs[Flatten[diff]]]}];
 		Print[Normal[result]];
 		result
