@@ -117,71 +117,14 @@ TMDHamNonInt = Function[{kx, ky},
   ]
 ];
 
-TMDHamMF = Function[{\[CapitalGamma],\[CapitalDelta]},
-  Function[{kx, ky},
-    Module[{hKinetic1, hKinetic2, hShift, hPairing},
-      hKinetic1 = TMDHamNonInt[ kx,  ky] - U/2 IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
-      hKinetic2 = TMDHamNonInt[-kx, -ky] - U/2 IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital];
-      hPairing = {{ 0, 0, \[CapitalDelta], 0},
-                  { 0, 0, 0, \[CapitalDelta]},
-                  {-\[CapitalDelta], 0, 0, 0},
-                  { 0,-\[CapitalDelta], 0, 0}};
-      KroneckerProduct[{{1,0},{0,0}}, hKinetic1]
-        + KroneckerProduct[{{0,0},{0,1}}, -Transpose[hKinetic2]]
-        + KroneckerProduct[{{0,1},{0,0}}, hPairing]
-        + KroneckerProduct[{{0,0},{1,0}}, ConjugateTranspose[hPairing]]
-    ]
-  ]
-];
 
-(* Assume eigenvalues sorted in descending order :
-   eigenvectors matrix (returned from Eigensystem)  = [ U  V  ;  V^*  U^*] *)
-ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
-  Module[{\[Psi], e, f, u, v, \[Rho], t, \[CapitalGamma]part, \[CapitalDelta]part},
-    \[Psi] = ArrayReshape[eigenvectors, {numNambu,  numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
-    e = ArrayReshape[eigenvalues, {numNambu,  numSpin*numOrbital}];
-    u = \[Psi][[1, All, 1, All, All]];
-    v = \[Psi][[1, All, 2, All, All]];
-    f = Map[fermi, e[[1, All]]]; (* Only positive eigenvalues *)
-    \[Rho][i_,j_,k_,l_] := (* \[Rho][i, j, k, l] =*) Total[u[[All, i, j]]*f*Conjugate[u[[All, k, l]]] + Conjugate[v[[All, i, j]]] * (1 - f) * v[[All, k, l]]];
-    t[i_,j_,k_,l_] := (* t[i, j, k, l] =*) Total[u[[All, i, j]]*f*Conjugate[v[[All, k, l]]] + Conjugate[v[[All, i, j]]] * (1 - f) * u[[All, k, l]]];
-    \[CapitalGamma]part = U (\[Rho][Up,A,Up,A] + \[Rho][Up,B,Up,B] + \[Rho][Dn,A,Dn,A] + \[Rho][Dn,B,Dn,B])/4; (* Note: U can be replaced by a function of (kx, ky) *)
-    \[CapitalDelta]part = U (t[Up,A,Dn,A] + t[Up,B,Dn,B])/2;
-    {\[CapitalGamma]part, \[CapitalDelta]part}
-  ]
-];
-
-
-(* Given \[CapitalGamma], \[CapitalDelta],
-   scan over BZ,
-   compute contributionos of new \[CapitalGamma] and new \[CapitalDelta] at each (kx, ky),
-   and return their means (over BZ) *)
-CollectMF = Function[{\[CapitalGamma],\[CapitalDelta]},
-  Module[{hamMF= TMDHamMF[\[CapitalGamma],\[CapitalDelta]]},
-    1/(N1*N2) Sum[
-      Module[{hk = hamMF@@k, eigenvalues, eigenvectors, idxPerm},
-        {eigenvalues, eigenvectors} = Eigensystem[hk];
-        
-        (* essential step for extracting U and V correctly *)
-        idxPerm = Ordering[eigenvalues, numNambu * numSpin * numOrbital, Greater];
-        eigenvalues = eigenvalues[[idxPerm]];
-        eigenvectors = eigenvectors[[idxPerm]];
-
-        (*Print["eigenvalues=", eigenvalues];Print["eigenvectors=", eigenvectors];*)
-        ComputeMF[Sequence@@k, eigenvalues, eigenvectors]
-      ],
-      {k, tmdLattice["kVectorSpan"]}
-    ]
-  ]
-];
-
-(* TMDHamMF2[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn] returns a mean field Hamiltonian with mean field parameters \[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn.
+(* TMDHamMF[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn] returns a mean field Hamiltonian with mean field parameters \[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn.
 \[CapitalGamma] is a real number, \[CapitalDelta]os is a 2 component array of complex numbers, and \[CapitalDelta]nn is a 3x2x2 array of complex numbers. *)
-TMDHamMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
+TMDHamMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
   Function[{kx, ky},
     Module[{k={kx,ky}, hKinetic1, hKinetic2, hShift, hPairing, \[CapitalDelta]AB, \[CapitalDelta]BA, \[CapitalDelta]0},
-      hKinetic1 = TMDHamNonInt[ kx,  ky] (*- ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital]*);
-      hKinetic2 = TMDHamNonInt[-kx, -ky] (*- ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + \[CapitalGamma] * IdentityMatrix[numSpin * numOrbital]*);
+      hKinetic1 = TMDHamNonInt[ kx,  ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]];
+      hKinetic2 = TMDHamNonInt[-kx, -ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]];
       Do[\[CapitalDelta]AB[\[Sigma]1, \[Sigma]2] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[ I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[ I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
       Do[\[CapitalDelta]BA[\[Sigma]1, \[Sigma]2] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[-I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[-I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
       \[CapitalDelta]0[sub_] := \[CapitalDelta]os[[sub]];
@@ -198,7 +141,7 @@ TMDHamMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
 
 (* Assume eigenvalues sorted in descending order :
    eigenvectors matrix (returned from `Eigensystem`)  = [ U  V  ;  V^*  U^*] *)
-ComputeMF2 = Function[{kx, ky, eigenvalues, eigenvectors},
+ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
   Module[{k={kx,ky}, \[Psi], e, f, u, v, \[Rho], t, \[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart},
     \[Psi] = ArrayReshape[eigenvectors, {numNambu*numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
     e = ArrayReshape[eigenvalues,  {numNambu*numSpin*numOrbital}];
@@ -212,12 +155,11 @@ ComputeMF2 = Function[{kx, ky, eigenvalues, eigenvectors},
     \[Rho][s1_,l1_,s2_,l2_,r_] := \[Rho][s1,l1,s2,l2] * Exp[-I k.r];
     t[s1_,l1_,s2_,l2_,r_] := t[s1,l1,s2,l2] * Exp[-I k.r];
 
-    (* Print[StringForm["\[Rho]=``",(\[Rho][Up,A,Up,A,{0,0}] + \[Rho][Up,B,Up,B,{0,0}] + \[Rho][Dn,A,Dn,A,{0,0}] + \[Rho][Dn,B,Dn,B,{0,0}])]]; *)
-    (*
-    \[CapitalGamma]part = ((U + 6 V)/4) * (\[Rho][Up,A,Up,A,{0,0}] + \[Rho][Up,B,Up,B,{0,0}] + \[Rho][Dn,A,Dn,A,{0,0}] + \[Rho][Dn,B,Dn,B,{0,0}]); (* Note: U can be replaced by a function of (kx, ky) *)
-    *)
-    \[CapitalGamma]part=0.0;
-    \[CapitalDelta]part = (U/2) * {t[Up,A,Dn,A,{0,0}] - t[Dn,A,Up,A,{0,0}], t[Up,B,Dn,B,{0,0}] - t[Dn,B,Up,B,{0,0}]};
+	\[CapitalGamma]part = {U*\[Rho][Dn,A,Dn,A] + 3*V*(\[Rho][Up,B,Up,B] + \[Rho][Dn,B,Dn,B]),
+             U*\[Rho][Dn,B,Dn,B] + 3*V*(\[Rho][Up,A,Up,A] + \[Rho][Dn,A,Dn,A]),
+             U*\[Rho][Up,A,Up,A] + 3*V*(\[Rho][Up,B,Up,B] + \[Rho][Dn,B,Dn,B]),
+             U*\[Rho][Up,B,Up,B] + 3*V*(\[Rho][Up,A,Up,A] + \[Rho][Dn,A,Dn,A])};
+    \[CapitalDelta]part = (U/2) * {t[Up,A,Dn,A] - t[Dn,A,Up,A], t[Up,B,Dn,B] - t[Dn,B,Up,B]};
     \[CapitalDelta]nnpart = (V/2) * Table[t[\[Sigma]1, A, \[Sigma]2, B, r] - t[\[Sigma]2, B, \[Sigma]1, A, -r], {r, {a1, a2, a3}}, {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
     {\[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart}
   ]
@@ -228,12 +170,12 @@ ComputeMF2 = Function[{kx, ky, eigenvalues, eigenvectors},
    scan over BZ,
    compute contributionos of new \[CapitalGamma] and new \[CapitalDelta] at each (kx, ky),
    and return their means (over BZ) *)
-CollectMF2 = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
-  Module[{hamMF= TMDHamMF2[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn]},
+CollectMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
+  Module[{hamMF= TMDHamMF[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn]},
     1/(N1*N2) Sum[
       Module[{hk=hamMF@@k, eigenvalues, eigenvectors},
         {eigenvalues, eigenvectors} = Eigensystem[hk];
-        ComputeMF2[Sequence@@k, eigenvalues, eigenvectors]
+        ComputeMF[Sequence@@k, eigenvalues, eigenvectors]
       ],
       {k, N[tmdLattice["kVectorSpan"]]}
     ]
