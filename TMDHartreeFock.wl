@@ -69,7 +69,9 @@ InitializeTMD[N1_Integer, N2_Integer, OptionsPattern[{IsingSpinOrbitCoupling->0,
                                                        RashbaSpinOrbitCoupling->0,
                                                        OnSiteInteraction->0,
                                                        NearestNeighborInteraction->0,
-                                                       Temperature->0}]] := 
+                                                       Temperature->0,
+                                                       FindHartreeShift->True,
+                                                       FindPairing->True}]] := 
 Module[{\[Beta]Ising=OptionValue[IsingSpinOrbitCoupling],
         mz=OptionValue[ChargeTransferEnergy],
         \[Mu]=OptionValue[ChemicalPotential],
@@ -140,22 +142,53 @@ CompiledTMDHamNonInt = Compile[{{kx,_Real}, {ky,_Real}},
   ]
 ];
 
+If[OptionValue[FindHartreeShift],
+  TMDKineticWithHartreeShift[\[CapitalGamma]_] := Function[{kx,ky},
+    TMDHamNonInt[ kx,  ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]]
+  ],
+  TMDKineticWithHartreeShift[\[CapitalGamma]_] := Function[{kx,ky},
+    TMDHamNonInt[ kx,  ky]
+  ]
+];
+
+If[OptionValue[FindPairing],
+  TMDPairingMatrix[\[CapitalDelta]os_, \[CapitalDelta]nn_] := Function[{kx,ky},
+    Module[{k={kx,ky},\[CapitalDelta]AB,\[CapitalDelta]BA,\[CapitalDelta]0, zero=0.0+0.0I},
+      Do[\[CapitalDelta]AB[\[Sigma]1, \[Sigma]2] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[ I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[ I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+      Do[\[CapitalDelta]BA[\[Sigma]1, \[Sigma]2] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[-I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[-I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+      \[CapitalDelta]0[sub_] := \[CapitalDelta]os[[sub]];
+      {{        zero,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
+       {  \[CapitalDelta]BA[Up,Up],        zero,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
+       {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],        zero,  \[CapitalDelta]AB[Dn,Dn]},
+       {  \[CapitalDelta]BA[Dn,Up],      -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],        zero}}
+    ]
+  ],
+  TMDPairingMatrix[\[CapitalDelta]os_, \[CapitalDelta]nn_] := Function[{kx,ky},ConstantArray[0.0+0.0I, {4,4}]]
+];
 
 (* TMDHamMF[\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn] returns a mean field Hamiltonian with mean field parameters \[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn.
 \[CapitalGamma] is a real number, \[CapitalDelta]os is a 2 component array of complex numbers, and \[CapitalDelta]nn is a 3x2x2 array of complex numbers. *)
 TMDHamMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
-  Function[{kx, ky},
-    Module[{k={kx,ky}, hKinetic1, hKinetic2, hShift, hPairing, \[CapitalDelta]AB, \[CapitalDelta]BA, \[CapitalDelta]0},
-      hKinetic1 = TMDHamNonInt[ kx,  ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]];
-      hKinetic2 = TMDHamNonInt[-kx, -ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]];
-      Do[\[CapitalDelta]AB[\[Sigma]1, \[Sigma]2] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[ I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[ I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
-      Do[\[CapitalDelta]BA[\[Sigma]1, \[Sigma]2] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[-I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[-I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
-      \[CapitalDelta]0[sub_] := \[CapitalDelta]os[[sub]];
-      hPairing = {{           0,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
-                  {  \[CapitalDelta]BA[Up,Up],           0,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
-                  {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],           0,  \[CapitalDelta]AB[Dn,Dn]},
-                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],            0}}; (*TODO(kyungminlee): Verify *)
-      ArrayFlatten[{{hKinetic1,hPairing},{ConjugateTranspose[hPairing],-Transpose[hKinetic2]}}]
+  With[{hamNonIntShift=TMDKineticWithHartreeShift[\[CapitalGamma]], hamPairing=TMDPairingMatrix[\[CapitalDelta]os,\[CapitalDelta]nn]},
+    Function[{kx, ky},
+      Module[{k={kx,ky}, hKinetic1, hKinetic2, hShift, hPairing, \[CapitalDelta]AB, \[CapitalDelta]BA, \[CapitalDelta]0},
+        (*
+        hKinetic1 = TMDHamNonInt[ kx,  ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]];
+        hKinetic2 = TMDHamNonInt[-kx, -ky] - ((U+6V)/2) * IdentityMatrix[numSpin * numOrbital] + DiagonalMatrix[\[CapitalGamma]];
+      
+        Do[\[CapitalDelta]AB[\[Sigma]1, \[Sigma]2] =  \[CapitalDelta]nn[[1, \[Sigma]1, \[Sigma]2]] Exp[ I k.a1] + \[CapitalDelta]nn[[2, \[Sigma]1, \[Sigma]2]] Exp[ I k.a2] + \[CapitalDelta]nn[[3, \[Sigma]1, \[Sigma]2]] Exp[ I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+        Do[\[CapitalDelta]BA[\[Sigma]1, \[Sigma]2] = -\[CapitalDelta]nn[[1, \[Sigma]2, \[Sigma]1]] Exp[-I k.a1] - \[CapitalDelta]nn[[2, \[Sigma]2, \[Sigma]1]] Exp[-I k.a2] - \[CapitalDelta]nn[[3, \[Sigma]2, \[Sigma]1]] Exp[-I k.a3], {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
+        \[CapitalDelta]0[sub_] := \[CapitalDelta]os[[sub]];
+        hPairing = {{           0,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
+                    {  \[CapitalDelta]BA[Up,Up],           0,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
+                    {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],           0,  \[CapitalDelta]AB[Dn,Dn]},
+                    {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],            0}}; (*TODO(kyungminlee): Verify *)
+        *)
+        hKinetic1=hamNonIntShift[kx,ky];
+        hKinetic2=hamNonIntShift[-kx,-ky];
+        hPairing=hamPairing[kx,ky];
+        ArrayFlatten[{{hKinetic1,hPairing},{ConjugateTranspose[hPairing],-Transpose[hKinetic2]}}]
+      ]
     ]
   ]
 ];
