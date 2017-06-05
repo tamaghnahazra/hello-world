@@ -16,11 +16,14 @@ InitializeTMD[N1_Integer, N2_Integer, OptionsPattern[{IsingSpinOrbitCoupling->0,
                                                        OnSiteInteraction->0,
                                                        NearestNeighborInteraction->0,
                                                        Temperature->0}]]";
-
+TMDLattice::usage="";
 TMDHamNonInt::usage = "";
 TMDHamMF::usage = "";
 ComputeMF::usage = "";
 CollectMF::usage = "";
+
+CollectMF2::usage = "";
+
 
 CompiledTMDHamNonInt::usage = "";
 CompiledTMDHamMF::usage = "";
@@ -74,8 +77,8 @@ Module[{\[Beta]Ising=OptionValue[IsingSpinOrbitCoupling],
         U=OptionValue[OnSiteInteraction],
         V=OptionValue[NearestNeighborInteraction],
         T=OptionValue[Temperature],
-        \[Sigma], \[Sigma]\[Sigma],
         Up=1, Dn=2, A=1, B=2,
+        \[Sigma], \[Sigma]\[Sigma],
         a1, a2, a3, b1, b2, b3, tmdLattice,
         fermi,compiledFermi,
         numNambu=2, numSpin=2, numOrbital=2,
@@ -102,6 +105,7 @@ b1 = { Sqrt[3], 0};
 b2 = {-Sqrt[3]/2,  3/2};
 b3 = {-Sqrt[3]/2, -3/2};
 tmdLattice = NewLattice[b1, b2, N1, N2];
+TMDLattice[]=tmdLattice;
 
 TMDHamNonInt = Function[{kx, ky},
   Module[{k={kx, ky}, T1, T1c, T2, \[Lambda]p, \[Lambda]m, \[Lambda]pc, \[Lambda]mc},
@@ -150,7 +154,7 @@ TMDHamMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
       hPairing = {{           0,  \[CapitalDelta]AB[Up,Up],       \[CapitalDelta]0[A],  \[CapitalDelta]AB[Up,Dn]},
                   {  \[CapitalDelta]BA[Up,Up],           0,  \[CapitalDelta]BA[Up,Dn],       \[CapitalDelta]0[B]},
                   {      -\[CapitalDelta]0[A],  \[CapitalDelta]AB[Dn,Up],           0,  \[CapitalDelta]AB[Dn,Dn]},
-                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],          0}}; (*TODO(kyungminlee): Verify *)
+                  {  \[CapitalDelta]BA[Dn,Up],     -\[CapitalDelta]0[B],  \[CapitalDelta]BA[Dn,Dn],            0}}; (*TODO(kyungminlee): Verify *)
       ArrayFlatten[{{hKinetic1,hPairing},{ConjugateTranspose[hPairing],-Transpose[hKinetic2]}}]
     ]
   ]
@@ -187,6 +191,7 @@ CompiledTMDHamMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]
 
 (* Assume eigenvalues sorted in descending order :
    eigenvectors matrix (returned from `Eigensystem`)  = [ U  V  ;  V^*  U^*] *)
+   (*Return "average" density AND mean fields *)
 ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
   Module[{k={kx,ky}, \[Psi], e, f, u, v, \[Rho], t, \[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart},
     \[Psi] = ArrayReshape[eigenvectors, {numNambu*numSpin*numOrbital,  numNambu,  numSpin,  numOrbital}];
@@ -265,6 +270,7 @@ CollectMF = Function[{\[CapitalGamma], \[CapitalDelta]os, \[CapitalDelta]nn},
     ]
   ]
 ];
+
 
 
 (* Given \[CapitalGamma], \[CapitalDelta],
