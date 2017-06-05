@@ -212,7 +212,7 @@ ComputeMF = Function[{kx, ky, eigenvalues, eigenvectors},
              U*\[Rho][Up,B,Up,B] + 3*V*(\[Rho][Up,A,Up,A] + \[Rho][Dn,A,Dn,A])};
     \[CapitalDelta]part = (U/2) * {t[Up,A,Dn,A] - t[Dn,A,Up,A], t[Up,B,Dn,B] - t[Dn,B,Up,B]};
     \[CapitalDelta]nnpart = (V/2) * Table[t[\[Sigma]1, A, \[Sigma]2, B, r] - t[\[Sigma]2, B, \[Sigma]1, A, -r], {r, {a1, a2, a3}}, {\[Sigma]1, {Up, Dn}}, {\[Sigma]2, {Up, Dn}}];
-    {\[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart}
+    {0.25*(\[Rho][Up,A,Up,A]+\[Rho][Up,B,Up,B]+\[Rho][Dn,A,Dn,A]+\[Rho][Dn,B,Dn,B]),\[CapitalGamma]part, \[CapitalDelta]part, \[CapitalDelta]nnpart}
   ]
 ];
 
